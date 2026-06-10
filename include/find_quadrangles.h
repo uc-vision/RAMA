@@ -24,7 +24,7 @@ inline void write_sorted_triangle(
     int* const __restrict__ tri_v1,
     int* const __restrict__ tri_v2,
     int* const __restrict__ tri_v3,
-    const int idx)
+    const long long idx)
 {
     const int min_v = thrust::min(a, thrust::min(b, c));
     const int max_v = thrust::max(a, thrust::max(b, c));
@@ -116,7 +116,7 @@ void deduplicate_triangles(
 
     thrust::sort(first, last);
     auto new_last = thrust::unique(first, last);
-    const int new_size = thrust::distance(first, new_last);
+    const auto new_size = thrust::distance(first, new_last);
 
     tri_v1.resize(new_size);
     tri_v2.resize(new_size);

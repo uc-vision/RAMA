@@ -13,6 +13,7 @@ target_link_libraries(rama_text_input_cpu RAMA multicut_text_parser)
 
 if(WITH_CUDA)
     pybind11_add_module(rama_py rama_py.cu)
+    target_compile_definitions(rama_py PRIVATE RAMA_TORCH_ALLOCATOR ${GPU_COMPILE_DEFINITIONS})
     target_link_libraries(rama_py PRIVATE multicut_text_parser RAMA)
     find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
     message(STATUS "TORCH_PYTHON_LIBRARY: ${TORCH_PYTHON_LIBRARY}") # https://github.com/pytorch/pytorch/issues/38122#issuecomment-694203281

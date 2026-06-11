@@ -16,6 +16,7 @@
 #include <thrust/sort.h>
 #include <thrust/scan.h>
 #include <thrust/scatter.h>
+#include "torch_thrust_execution.h"
 
 #ifdef __CUDACC__
 #define RAMA_HOST_DEVICE __host__ __device__
@@ -107,11 +108,11 @@ std::tuple<thrust::device_vector<int>, thrust::device_vector<int>> to_undirected
     thrust::device_vector<int> row_ids_u(2 * nr_edges);
     thrust::device_vector<int> col_ids_u(2 * nr_edges);
 
-    thrust::copy(row_id_begin, row_id_end, row_ids_u.begin());
-    thrust::copy(row_id_begin, row_id_end, col_ids_u.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC row_id_begin, row_id_end, row_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC row_id_begin, row_id_end, col_ids_u.begin() + nr_edges);
 
-    thrust::copy(col_id_begin, col_id_end, col_ids_u.begin());
-    thrust::copy(col_id_begin, col_id_end, row_ids_u.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC col_id_begin, col_id_end, col_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC col_id_begin, col_id_end, row_ids_u.begin() + nr_edges);
 
     return {row_ids_u, col_ids_u};
 }
@@ -131,14 +132,14 @@ std::tuple<thrust::device_vector<int>, thrust::device_vector<int>, thrust::devic
     thrust::device_vector<int> row_ids_u(2 * nr_edges);
     thrust::device_vector<float> costs_u(2 * nr_edges);
 
-    thrust::copy(row_id_begin, row_id_end, row_ids_u.begin());
-    thrust::copy(row_id_begin, row_id_end, col_ids_u.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC row_id_begin, row_id_end, row_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC row_id_begin, row_id_end, col_ids_u.begin() + nr_edges);
 
-    thrust::copy(col_id_begin, col_id_end, col_ids_u.begin());
-    thrust::copy(col_id_begin, col_id_end, row_ids_u.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC col_id_begin, col_id_end, col_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC col_id_begin, col_id_end, row_ids_u.begin() + nr_edges);
 
-    thrust::copy(data_begin, data_end, costs_u.begin());
-    thrust::copy(data_begin, data_end, costs_u.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC data_begin, data_end, costs_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC data_begin, data_end, costs_u.begin() + nr_edges);
 
     return {row_ids_u, col_ids_u, costs_u};
 }
@@ -149,10 +150,10 @@ inline std::tuple<VectorType<int>, VectorType<int>> to_undirected(const VectorTy
     assert(i.size() == j.size());
     const size_t n = i.size();
     VectorType<int> row_ids_u(2 * n), col_ids_u(2 * n);
-    thrust::copy(i.begin(), i.end(), row_ids_u.begin());
-    thrust::copy(j.begin(), j.end(), row_ids_u.begin() + n);
-    thrust::copy(j.begin(), j.end(), col_ids_u.begin());
-    thrust::copy(i.begin(), i.end(), col_ids_u.begin() + n);
+    thrust::copy(RAMA_THRUST_EXEC i.begin(), i.end(), row_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC j.begin(), j.end(), row_ids_u.begin() + n);
+    thrust::copy(RAMA_THRUST_EXEC j.begin(), j.end(), col_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC i.begin(), i.end(), col_ids_u.begin() + n);
     return {row_ids_u, col_ids_u};
 }
 
@@ -163,12 +164,12 @@ inline std::tuple<VectorType<int>, VectorType<int>, VectorType<float>> to_undire
     const size_t n = i.size();
     VectorType<int> row_ids_u(2 * n), col_ids_u(2 * n);
     VectorType<float> costs_u(2 * n);
-    thrust::copy(i.begin(), i.end(), row_ids_u.begin());
-    thrust::copy(j.begin(), j.end(), row_ids_u.begin() + n);
-    thrust::copy(j.begin(), j.end(), col_ids_u.begin());
-    thrust::copy(i.begin(), i.end(), col_ids_u.begin() + n);
-    thrust::copy(costs.begin(), costs.end(), costs_u.begin());
-    thrust::copy(costs.begin(), costs.end(), costs_u.begin() + n);
+    thrust::copy(RAMA_THRUST_EXEC i.begin(), i.end(), row_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC j.begin(), j.end(), row_ids_u.begin() + n);
+    thrust::copy(RAMA_THRUST_EXEC j.begin(), j.end(), col_ids_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC i.begin(), i.end(), col_ids_u.begin() + n);
+    thrust::copy(RAMA_THRUST_EXEC costs.begin(), costs.end(), costs_u.begin());
+    thrust::copy(RAMA_THRUST_EXEC costs.begin(), costs.end(), costs_u.begin() + n);
     return {row_ids_u, col_ids_u, costs_u};
 }
 
@@ -176,7 +177,7 @@ template<template<typename> class VectorType>
 inline VectorType<int> offsets_to_degrees(const VectorType<int>& offsets)
 {
     VectorType<int> degrees(offsets.size());
-    thrust::adjacent_difference(offsets.begin(), offsets.end(), degrees.begin());
+    thrust::adjacent_difference(RAMA_THRUST_EXEC offsets.begin(), offsets.end(), degrees.begin());
     return VectorType<int>(degrees.begin() + 1, degrees.end());
 }
 
@@ -184,7 +185,7 @@ template<template<typename> class VectorType>
 inline VectorType<int> degrees_to_offsets(const VectorType<int>& degrees)
 {
     VectorType<int> offsets(degrees.size() + 1);
-    thrust::exclusive_scan(degrees.begin(), degrees.end(), offsets.begin());
+    thrust::exclusive_scan(RAMA_THRUST_EXEC degrees.begin(), degrees.end(), offsets.begin());
     offsets[offsets.size() - 1] = offsets[offsets.size() - 2] + degrees[degrees.size() - 1];
     return offsets;
 }
@@ -192,19 +193,19 @@ inline VectorType<int> degrees_to_offsets(const VectorType<int>& degrees)
 template<template<typename> class VectorType>
 inline VectorType<int> compress_label_sequence(const VectorType<int>& data, const int max_label)
 {
-    assert(*thrust::max_element(data.begin(), data.end()) <= max_label);
+    assert(*thrust::max_element(RAMA_THRUST_EXEC data.begin(), data.end()) <= max_label);
 
     // first get mask of used labels
     VectorType<int> label_mask(max_label + 1, 0);
-    thrust::scatter(thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + data.size(), data.begin(), label_mask.begin());
+    thrust::scatter(RAMA_THRUST_EXEC thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + data.size(), data.begin(), label_mask.begin());
 
     // get map of original labels to consecutive ones
     VectorType<int> label_to_consecutive(max_label + 1);
-    thrust::exclusive_scan(label_mask.begin(), label_mask.end(), label_to_consecutive.begin());
+    thrust::exclusive_scan(RAMA_THRUST_EXEC label_mask.begin(), label_mask.end(), label_to_consecutive.begin());
 
     // apply compressed label map
     VectorType<int> result(data.size(), 0);
-    thrust::gather(data.begin(), data.end(), label_to_consecutive.begin(), result.begin());
+    thrust::gather(RAMA_THRUST_EXEC data.begin(), data.end(), label_to_consecutive.begin(), result.begin());
 
     return result;
 }
@@ -219,7 +220,7 @@ struct compute_lb
 
 inline double get_lb(const thrust::device_vector<float>& costs)
 {
-    return thrust::transform_reduce(costs.begin(), costs.end(), compute_lb(), 0.0, thrust::plus<double>());
+    return thrust::transform_reduce(RAMA_THRUST_EXEC costs.begin(), costs.end(), compute_lb(), 0.0, thrust::plus<double>());
 }
 
 inline double get_obj(const std::vector<int>& h_node_mapping, const std::vector<int>& i, const std::vector<int>& j, const std::vector<float>& costs)
@@ -253,7 +254,7 @@ inline std::tuple<thrust::device_vector<int>, thrust::device_vector<int>, thrust
     thrust::device_vector<float> costs = costs_symm;
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin(), costs.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end(), costs.end()));
-    auto new_last = thrust::remove_if(first, last, remove_reverse_edges_func());
+    auto new_last = thrust::remove_if(RAMA_THRUST_EXEC first, last, remove_reverse_edges_func());
     i.resize(std::distance(first, new_last));
     j.resize(std::distance(first, new_last));
     costs.resize(std::distance(first, new_last)); 
@@ -284,7 +285,7 @@ inline void sort_edge_nodes(VectorType<int>& i, VectorType<int>& j)
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
 
-    thrust::for_each(first, last, sort_edge_nodes_func());
+    thrust::for_each(RAMA_THRUST_EXEC first, last, sort_edge_nodes_func());
 }
 
 struct map_values_func
@@ -309,7 +310,7 @@ inline void coo_sorting(VectorType<int>& i, VectorType<int>& j, VectorType<int>&
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin(), k.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end(), k.end()));
 
-    thrust::sort(first, last);
+    thrust::sort(RAMA_THRUST_EXEC first, last);
 }
 
 template<template<typename> class VectorType>
@@ -317,7 +318,7 @@ inline void coo_sorting(VectorType<int>& i, VectorType<int>& j)
 {
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
-    thrust::sort(first, last);
+    thrust::sort(RAMA_THRUST_EXEC first, last);
 }
 
 template<template<typename> class VectorType>
@@ -327,7 +328,7 @@ inline void coo_sorting(VectorType<int>& i, VectorType<int>& j, VectorType<float
     assert(i.size() == data.size());
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
-    thrust::sort_by_key(first, last, data.begin());
+    thrust::sort_by_key(RAMA_THRUST_EXEC first, last, data.begin());
 }
 
 struct triangle_duplicate_nodes
@@ -366,8 +367,8 @@ inline void normalize_triangles(thrust::device_vector<int>& t1, thrust::device_v
     {
         auto first = thrust::make_zip_iterator(thrust::make_tuple(t1.begin(), t2.begin(), t3.begin()));
         auto last = thrust::make_zip_iterator(thrust::make_tuple(t1.end(), t2.end(), t3.end()));
-        auto new_last = thrust::remove_if(first, last, triangle_duplicate_nodes());
-        thrust::for_each(first, new_last, sort_triangle_nodes_func());
+        auto new_last = thrust::remove_if(RAMA_THRUST_EXEC first, last, triangle_duplicate_nodes());
+        thrust::for_each(RAMA_THRUST_EXEC first, new_last, sort_triangle_nodes_func());
         t1.resize(std::distance(first, new_last)); 
         t2.resize(std::distance(first, new_last)); 
         t3.resize(std::distance(first, new_last)); 
@@ -376,10 +377,10 @@ inline void normalize_triangles(thrust::device_vector<int>& t1, thrust::device_v
     // sort triangles and remove duplicates
     {
         coo_sorting<thrust::device_vector>(t1, t2, t3);
-        assert(thrust::is_sorted(t1.begin(), t1.end()));
+        assert(thrust::is_sorted(RAMA_THRUST_EXEC t1.begin(), t1.end()));
         auto first = thrust::make_zip_iterator(thrust::make_tuple(t1.begin(), t2.begin(), t3.begin()));
         auto last = thrust::make_zip_iterator(thrust::make_tuple(t1.end(), t2.end(), t3.end()));
-        auto new_last = thrust::unique(first, last);
+        auto new_last = thrust::unique(RAMA_THRUST_EXEC first, last);
         t1.resize(std::distance(first, new_last)); 
         t2.resize(std::distance(first, new_last)); 
         t3.resize(std::distance(first, new_last)); 
@@ -391,28 +392,28 @@ inline int rearrange_triangles(thrust::device_vector<int>& t1, thrust::device_ve
     
     auto first = thrust::make_zip_iterator(thrust::make_tuple(t1.begin(), t2.begin(), t3.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(t1.begin() + valid_num, t2.begin() + valid_num, t3.begin() + valid_num));
-    auto new_last = thrust::remove_if(first, last, triangle_duplicate_nodes());
-    thrust::for_each(first, new_last, sort_triangle_nodes_func());
+    auto new_last = thrust::remove_if(RAMA_THRUST_EXEC first, last, triangle_duplicate_nodes());
+    thrust::for_each(RAMA_THRUST_EXEC first, new_last, sort_triangle_nodes_func());
 
-    thrust::sort(first, new_last);
-    auto new_last_unique = thrust::unique(first, new_last);
+    thrust::sort(RAMA_THRUST_EXEC first, new_last);
+    auto new_last_unique = thrust::unique(RAMA_THRUST_EXEC first, new_last);
     return std::distance(first, new_last_unique);
 }
 
 template<template<typename> class VectorType>
 inline std::tuple<VectorType<int>, VectorType<int>> get_unique_with_counts(const VectorType<int>& input)
 {
-    assert(thrust::is_sorted(input.begin(), input.end()));
+    assert(thrust::is_sorted(RAMA_THRUST_EXEC input.begin(), input.end()));
     VectorType<int> unique_counts(input.size() + 1);
     VectorType<int> unique_values(input.size());
 
-    auto new_end = thrust::unique_by_key_copy(input.begin(), input.end(), thrust::make_counting_iterator(0), unique_values.begin(), unique_counts.begin());
+    auto new_end = thrust::unique_by_key_copy(RAMA_THRUST_EXEC input.begin(), input.end(), thrust::make_counting_iterator(0), unique_values.begin(), unique_counts.begin());
     int num_unique = std::distance(unique_values.begin(), new_end.first);
     unique_values.resize(num_unique);
     unique_counts.resize(num_unique + 1); // contains smallest index of each unique element.
 
     unique_counts[num_unique] = input.size();
-    thrust::adjacent_difference(unique_counts.begin(), unique_counts.end(), unique_counts.begin());
+    thrust::adjacent_difference(RAMA_THRUST_EXEC unique_counts.begin(), unique_counts.end(), unique_counts.begin());
     unique_counts = VectorType<int>(unique_counts.begin() + 1, unique_counts.end());
 
     return {unique_values, unique_counts};
@@ -422,18 +423,18 @@ inline thrust::device_vector<int> invert_unique(const thrust::device_vector<int>
 {
     thrust::device_vector<int> counts_sum(counts.size() + 1);
     counts_sum[0] = 0;
-    thrust::inclusive_scan(counts.begin(), counts.end(), counts_sum.begin() + 1);
+    thrust::inclusive_scan(RAMA_THRUST_EXEC counts.begin(), counts.end(), counts_sum.begin() + 1);
     
     int out_size = counts_sum.back();
     thrust::device_vector<int> output_indices(out_size, 0);
 
-    thrust::scatter(thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + values.size(), counts_sum.begin(), output_indices.begin());
+    thrust::scatter(RAMA_THRUST_EXEC thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + values.size(), counts_sum.begin(), output_indices.begin());
 
-    thrust::inclusive_scan(output_indices.begin(), output_indices.end(), output_indices.begin());
-    thrust::transform(output_indices.begin(), output_indices.end(), thrust::make_constant_iterator(1), output_indices.begin(), thrust::minus<int>());
+    thrust::inclusive_scan(RAMA_THRUST_EXEC output_indices.begin(), output_indices.end(), output_indices.begin());
+    thrust::transform(RAMA_THRUST_EXEC output_indices.begin(), output_indices.end(), thrust::make_constant_iterator(1), output_indices.begin(), thrust::minus<int>());
 
     thrust::device_vector<int> out_values(out_size);
-    thrust::gather(output_indices.begin(), output_indices.end(), values.begin(), out_values.begin());
+    thrust::gather(RAMA_THRUST_EXEC output_indices.begin(), output_indices.end(), values.begin(), out_values.begin());
 
     return out_values;
 }
@@ -441,13 +442,13 @@ inline thrust::device_vector<int> invert_unique(const thrust::device_vector<int>
 template<template<typename> class VectorType>
 inline VectorType<int> compute_offsets(const VectorType<int>& i, const int max_value)
 {
-    assert(thrust::is_sorted(i.begin(), i.end()));
+    assert(thrust::is_sorted(RAMA_THRUST_EXEC i.begin(), i.end()));
     VectorType<int> offsets(max_value + 2, 0);
     VectorType<int> unique_ids, counts;
     std::tie(unique_ids, counts) = get_unique_with_counts<VectorType>(i);
-    thrust::transform(unique_ids.begin(), unique_ids.end(), thrust::make_constant_iterator<int>(1), unique_ids.begin(), thrust::plus<int>());
-    thrust::scatter(counts.begin(), counts.end(), unique_ids.begin(), offsets.begin());
-    thrust::inclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
+    thrust::transform(RAMA_THRUST_EXEC unique_ids.begin(), unique_ids.end(), thrust::make_constant_iterator<int>(1), unique_ids.begin(), thrust::plus<int>());
+    thrust::scatter(RAMA_THRUST_EXEC counts.begin(), counts.end(), unique_ids.begin(), offsets.begin());
+    thrust::inclusive_scan(RAMA_THRUST_EXEC offsets.begin(), offsets.end(), offsets.begin());
     return offsets;
 }
 
@@ -459,11 +460,11 @@ inline void map_old_values_consec(VectorType<int>& src,
                                 const int old_max_value)
 {
     VectorType<int> mapping(old_max_value + 1, -1);
-    thrust::scatter(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + old_values.size(),
+    thrust::scatter(RAMA_THRUST_EXEC thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + old_values.size(),
                     old_values.begin(), mapping.begin());
 
     map_values_func mapper({thrust::raw_pointer_cast(mapping.data()), mapping.size()});
-    thrust::transform(src.begin(), src.end(), src.begin(), mapper);
+    thrust::transform(RAMA_THRUST_EXEC src.begin(), src.end(), src.begin(), mapper);
 }
 
 inline thrust::device_vector<int> compute_sanitized_graph(thrust::device_vector<int>& i, thrust::device_vector<int>& j, thrust::device_vector<float>& data)
@@ -474,7 +475,7 @@ inline thrust::device_vector<int> compute_sanitized_graph(thrust::device_vector<
     coo_sorting<thrust::device_vector>(i, j, data);
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
-    auto new_last = thrust::unique_by_key(first, last, data.begin());
+    auto new_last = thrust::unique_by_key(RAMA_THRUST_EXEC first, last, data.begin());
     auto num_unique_edges = thrust::distance(first, new_last.first);
     i.resize(num_unique_edges);
     j.resize(num_unique_edges);
@@ -483,24 +484,24 @@ inline thrust::device_vector<int> compute_sanitized_graph(thrust::device_vector<
     // Find unique node IDs in graph.
 
     thrust::device_vector<int> unique_node_ids(2 * i.size());
-    thrust::copy(i.begin(), i.end(), unique_node_ids.begin());
-    thrust::copy(j.begin(), j.end(), unique_node_ids.begin() + i.size());
+    thrust::copy(RAMA_THRUST_EXEC i.begin(), i.end(), unique_node_ids.begin());
+    thrust::copy(RAMA_THRUST_EXEC j.begin(), j.end(), unique_node_ids.begin() + i.size());
 
-    thrust::sort(unique_node_ids.begin(), unique_node_ids.end());
-    auto unique_end = thrust::unique(unique_node_ids.begin(), unique_node_ids.end());
+    thrust::sort(RAMA_THRUST_EXEC unique_node_ids.begin(), unique_node_ids.end());
+    auto unique_end = thrust::unique(RAMA_THRUST_EXEC unique_node_ids.begin(), unique_node_ids.end());
     unique_node_ids.resize(std::distance(unique_node_ids.begin(), unique_end));
 
     const int max_node_id = unique_node_ids.back();
     thrust::device_vector<int> ids_mapping(max_node_id + 1, 0);
-    thrust::scatter(thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + unique_node_ids.size(), 
+    thrust::scatter(RAMA_THRUST_EXEC thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + unique_node_ids.size(), 
                     unique_node_ids.begin(), ids_mapping.begin());
 
-    thrust::exclusive_scan(ids_mapping.begin(), ids_mapping.end(), ids_mapping.begin());
+    thrust::exclusive_scan(RAMA_THRUST_EXEC ids_mapping.begin(), ids_mapping.end(), ids_mapping.begin());
     
     // Assign original node IDs to new IDs such that all nodes have incident edges in the new graph.
     map_values_func mapper({thrust::raw_pointer_cast(ids_mapping.data()), ids_mapping.size()}); 
-    thrust::transform(i.begin(), i.end(), i.begin(), mapper);
-    thrust::transform(j.begin(), j.end(), j.begin(), mapper);
+    thrust::transform(RAMA_THRUST_EXEC i.begin(), i.end(), i.begin(), mapper);
+    thrust::transform(RAMA_THRUST_EXEC j.begin(), j.end(), j.begin(), mapper);
      
     return ids_mapping;
 }
@@ -526,7 +527,7 @@ inline thrust::device_vector<int> desanitize_node_labels(const thrust::device_ve
                                             ids_mapping.size()}); 
 
     thrust::device_vector<int> all_nodes_labels(ids_mapping.size(), -1); // -1 label is for nodes which did not have any incident edges!
-    thrust::transform(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + all_nodes_labels.size(), 
+    thrust::transform(RAMA_THRUST_EXEC thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + all_nodes_labels.size(), 
                     all_nodes_labels.begin(), desanitizer);
 
     return all_nodes_labels;
@@ -536,8 +537,8 @@ template<typename T>
 inline thrust::device_vector<T> concatenate(const thrust::device_vector<T>& a, const thrust::device_vector<T>& b)
 {
     thrust::device_vector<T> ab(a.size() + b.size());
-    thrust::copy(a.begin(), a.end(), ab.begin());
-    thrust::copy(b.begin(), b.end(), ab.begin() + a.size());
+    thrust::copy(RAMA_THRUST_EXEC a.begin(), a.end(), ab.begin());
+    thrust::copy(RAMA_THRUST_EXEC b.begin(), b.end(), ab.begin() + a.size());
     return ab;
 }
 
@@ -546,11 +547,11 @@ inline void print_vector(const thrust::device_vector<T>& v, const char* name, co
 {
     std::cout<<name<<": ";
     if (num == 0)
-        thrust::copy(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));
+        thrust::copy(RAMA_THRUST_EXEC v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));
     else
     {
         int size = std::distance(v.begin(), v.end());
-        thrust::copy(v.begin(), v.begin() + std::min(size, num), std::ostream_iterator<T>(std::cout, " "));
+        thrust::copy(RAMA_THRUST_EXEC v.begin(), v.begin() + std::min(size, num), std::ostream_iterator<T>(std::cout, " "));
     }
     std::cout<<"\n";
 }

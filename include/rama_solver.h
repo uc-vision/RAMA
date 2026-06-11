@@ -20,6 +20,7 @@
 #include <thrust/for_each.h>
 #include <thrust/copy.h>
 #include <thrust/reduce.h>
+#include "torch_thrust_execution.h"
 
 #ifdef __CUDACC__
 #define SOLVER_HOST_DEVICE __host__ __device__
@@ -34,7 +35,7 @@ bool has_bad_contractions(const Graph<VectorType>& G)
 {
     VectorType<float> d = G.self_loop_costs();
     auto is_neg = [] SOLVER_HOST_DEVICE (const float x) { return x < 0.0f; };
-    return thrust::count_if(d.begin(), d.end(), is_neg) > 0;
+    return thrust::count_if(RAMA_THRUST_EXEC d.begin(), d.end(), is_neg) > 0;
 }
 
 template<template<typename> class VectorType>
@@ -44,7 +45,7 @@ void map_node_labels(const VectorType<int>& cur_node_mapping, VectorType<int>& o
     int* orig_ptr = thrust::raw_pointer_cast(orig_node_mapping.data());
     const unsigned long num_nodes_cont = cur_node_mapping.size();
 
-    thrust::for_each(
+    thrust::for_each(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator<int>(0),
         thrust::make_counting_iterator<int>((int)orig_node_mapping.size()),
         [cur_ptr, orig_ptr, num_nodes_cont] SOLVER_HOST_DEVICE (const int n) {
@@ -77,7 +78,7 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     VectorType<int> node_mapping(G.num_nodes());
-    thrust::sequence(node_mapping.begin(), node_mapping.end());
+    thrust::sequence(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end());
 
     std::vector<std::vector<int>> timeline;
 
@@ -149,7 +150,7 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
         if (opts.verbose)
         {
             VectorType<float> slc = new_G.self_loop_costs();
-            float energy_reduction = thrust::reduce(slc.begin(), slc.end());
+            float energy_reduction = thrust::reduce(RAMA_THRUST_EXEC slc.begin(), slc.end());
             std::cout << "energy reduction " << energy_reduction << "\n";
         }
 
@@ -168,7 +169,7 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
         if (opts.dump_timeline)
         {
             std::vector<int> current_timeline(node_mapping.size());
-            thrust::copy(node_mapping.begin(), node_mapping.end(), current_timeline.begin());
+            thrust::copy(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end(), current_timeline.begin());
             timeline.push_back(current_timeline);
         }
 

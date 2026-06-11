@@ -12,6 +12,7 @@
 #include <thrust/functional.h>
 #include <thrust/copy.h>
 #include <thrust/swap.h>
+#include "torch_thrust_execution.h"
 
 namespace connected_components {
 
@@ -30,7 +31,7 @@ VectorType<int> compute_cc(const int num_nodes,
     const int m = tails.size();
 
     VectorType<int> labels(num_nodes);
-    thrust::sequence(labels.begin(), labels.end());
+    thrust::sequence(RAMA_THRUST_EXEC labels.begin(), labels.end());
 
     if (num_nodes == 0 || m == 0)
         return labels;
@@ -38,7 +39,7 @@ VectorType<int> compute_cc(const int num_nodes,
     // Pre-sort edges by source (once, outside the loop)
     VectorType<int> sorted_src(tails);
     VectorType<int> sorted_dst(heads);
-    thrust::sort_by_key(sorted_src.begin(), sorted_src.end(), sorted_dst.begin());
+    thrust::sort_by_key(RAMA_THRUST_EXEC sorted_src.begin(), sorted_src.end(), sorted_dst.begin());
 
     VectorType<int> neighbor_labels(m);
     VectorType<int> unique_src(m);
@@ -49,12 +50,12 @@ VectorType<int> compute_cc(const int num_nodes,
     bool done = false;
     while (!done) {
         // Gather label[dst] for each edge (sorted by src)
-        thrust::gather(sorted_dst.begin(), sorted_dst.end(),
+        thrust::gather(RAMA_THRUST_EXEC sorted_dst.begin(), sorted_dst.end(),
                        labels.begin(),
                        neighbor_labels.begin());
 
         // Reduce min label per source node
-        auto end = thrust::reduce_by_key(
+        auto end = thrust::reduce_by_key(RAMA_THRUST_EXEC 
             sorted_src.begin(), sorted_src.end(),
             neighbor_labels.begin(),
             unique_src.begin(),
@@ -64,23 +65,23 @@ VectorType<int> compute_cc(const int num_nodes,
         int k = end.first - unique_src.begin();
 
         // Start with current labels, scatter minima
-        thrust::copy(labels.begin(), labels.end(), labels_next.begin());
-        thrust::scatter(min_labels.begin(), min_labels.begin() + k,
+        thrust::copy(RAMA_THRUST_EXEC labels.begin(), labels.end(), labels_next.begin());
+        thrust::scatter(RAMA_THRUST_EXEC min_labels.begin(), min_labels.begin() + k,
                         unique_src.begin(),
                         labels_next.begin());
 
         // Enforce min(self, neighbor)
-        thrust::transform(labels.begin(), labels.end(),
+        thrust::transform(RAMA_THRUST_EXEC labels.begin(), labels.end(),
                           labels_next.begin(),
                           labels_next.begin(),
                           thrust::minimum<int>());
 
         // Pointer jumping (path compression) into separate buffer
-        thrust::gather(labels_next.begin(), labels_next.end(),
+        thrust::gather(RAMA_THRUST_EXEC labels_next.begin(), labels_next.end(),
                        labels_next.begin(),
                        labels_jumped.begin());
 
-        done = thrust::equal(labels.begin(), labels.end(),
+        done = thrust::equal(RAMA_THRUST_EXEC labels.begin(), labels.end(),
                              labels_jumped.begin());
 
         labels.swap(labels_jumped);

@@ -13,6 +13,7 @@
 #include "find_triangles.h"
 #include "find_quadrangles.h"
 #include "find_pentagons.h"
+#include "torch_thrust_execution.h"
 
 // Find all conflicted cycles up to max_cycle_length (3-5) in the graph,
 // decompose them into triangles, and return deduplicated sorted triangles.
@@ -50,7 +51,7 @@ conflicted_cycles(const Graph<VectorType>& G, int max_cycle_length,
     const int* heads_ptr = G.get_heads_ptr();
     const float* costs_ptr = G.get_costs_ptr();
 
-    const int num_rep = thrust::count_if(
+    const int num_rep = thrust::count_if(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(num_directed),
         [tails_ptr, heads_ptr, costs_ptr, neg_thresh]
@@ -72,7 +73,7 @@ conflicted_cycles(const Graph<VectorType>& G, int max_cycle_length,
     auto dst_first = thrust::make_zip_iterator(
         thrust::make_tuple(rep_tails.begin(), rep_heads.begin()));
 
-    thrust::copy_if(
+    thrust::copy_if(RAMA_THRUST_EXEC 
         src_first, src_last,
         thrust::make_counting_iterator(0),
         dst_first,
@@ -116,9 +117,9 @@ conflicted_cycles(const Graph<VectorType>& G, int max_cycle_length,
             all_v1.resize(old_size + v1.size());
             all_v2.resize(old_size + v2.size());
             all_v3.resize(old_size + v3.size());
-            thrust::copy(v1.begin(), v1.end(), all_v1.begin() + old_size);
-            thrust::copy(v2.begin(), v2.end(), all_v2.begin() + old_size);
-            thrust::copy(v3.begin(), v3.end(), all_v3.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v1.begin(), v1.end(), all_v1.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v2.begin(), v2.end(), all_v2.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v3.begin(), v3.end(), all_v3.begin() + old_size);
         }
     }
 
@@ -135,9 +136,9 @@ conflicted_cycles(const Graph<VectorType>& G, int max_cycle_length,
             all_v1.resize(old_size + v1.size());
             all_v2.resize(old_size + v2.size());
             all_v3.resize(old_size + v3.size());
-            thrust::copy(v1.begin(), v1.end(), all_v1.begin() + old_size);
-            thrust::copy(v2.begin(), v2.end(), all_v2.begin() + old_size);
-            thrust::copy(v3.begin(), v3.end(), all_v3.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v1.begin(), v1.end(), all_v1.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v2.begin(), v2.end(), all_v2.begin() + old_size);
+            thrust::copy(RAMA_THRUST_EXEC v3.begin(), v3.end(), all_v3.begin() + old_size);
         }
     }
 

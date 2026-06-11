@@ -23,6 +23,7 @@
 #include <thrust/count.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <iostream>
+#include "torch_thrust_execution.h"
 
 // Portable host/device annotation for functors.
 // When compiled with nvcc (__CUDACC__), expands to __host__ __device__.
@@ -183,7 +184,7 @@ inline void Graph<VectorType>::coo_sort(VectorType<int>& i, VectorType<int>& j, 
 
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
-    thrust::sort_by_key(first, last, costs.begin());
+    thrust::sort_by_key(RAMA_THRUST_EXEC first, last, costs.begin());
 }
 
 // Functor that normalizes an edge (i,j) to (min(i,j), max(i,j))
@@ -213,15 +214,15 @@ inline bool Graph<VectorType>::is_single_orientation(
     auto edge_end   = thrust::make_zip_iterator(thrust::make_tuple(tail_end,   head_end));
     auto norm_begin = thrust::make_zip_iterator(thrust::make_tuple(lo.begin(), hi.begin()));
 
-    thrust::transform(edge_begin, edge_end, norm_begin, normalize_edge_func());
+    thrust::transform(RAMA_THRUST_EXEC edge_begin, edge_end, norm_begin, normalize_edge_func());
 
     // Sort the normalized pairs
     auto sort_begin = thrust::make_zip_iterator(thrust::make_tuple(lo.begin(), hi.begin()));
     auto sort_end   = thrust::make_zip_iterator(thrust::make_tuple(lo.end(),   hi.end()));
-    thrust::sort(sort_begin, sort_end);
+    thrust::sort(RAMA_THRUST_EXEC sort_begin, sort_end);
 
     // If all normalized edges are unique, no edge was provided in both orientations
-    auto unique_end = thrust::unique(sort_begin, sort_end);
+    auto unique_end = thrust::unique(RAMA_THRUST_EXEC sort_begin, sort_end);
     size_t num_unique = std::distance(sort_begin, unique_end);
 
     return num_unique == n;
@@ -243,9 +244,9 @@ inline bool Graph<VectorType>::has_duplicate_edges(
 
     auto sort_begin = thrust::make_zip_iterator(thrust::make_tuple(t.begin(), h.begin()));
     auto sort_end   = thrust::make_zip_iterator(thrust::make_tuple(t.end(),   h.end()));
-    thrust::sort(sort_begin, sort_end);
+    thrust::sort(RAMA_THRUST_EXEC sort_begin, sort_end);
 
-    auto unique_end = thrust::unique(sort_begin, sort_end);
+    auto unique_end = thrust::unique(RAMA_THRUST_EXEC sort_begin, sort_end);
     size_t num_unique = std::distance(sort_begin, unique_end);
 
     return num_unique != n;
@@ -262,14 +263,14 @@ inline void Graph<VectorType>::ensure_symmetric()
     VectorType<float> costs_symm(2 * nr_edges);
 
     // Copy original edges (i->j)
-    thrust::copy(tails_.begin(), tails_.end(), tails_symm.begin());
-    thrust::copy(heads_.begin(), heads_.end(), heads_symm.begin());
-    thrust::copy(costs_.begin(), costs_.end(), costs_symm.begin());
+    thrust::copy(RAMA_THRUST_EXEC tails_.begin(), tails_.end(), tails_symm.begin());
+    thrust::copy(RAMA_THRUST_EXEC heads_.begin(), heads_.end(), heads_symm.begin());
+    thrust::copy(RAMA_THRUST_EXEC costs_.begin(), costs_.end(), costs_symm.begin());
 
     // Copy reverse edges (j->i)
-    thrust::copy(tails_.begin(), tails_.end(), heads_symm.begin() + nr_edges);
-    thrust::copy(heads_.begin(), heads_.end(), tails_symm.begin() + nr_edges);
-    thrust::copy(costs_.begin(), costs_.end(), costs_symm.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC tails_.begin(), tails_.end(), heads_symm.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC heads_.begin(), heads_.end(), tails_symm.begin() + nr_edges);
+    thrust::copy(RAMA_THRUST_EXEC costs_.begin(), costs_.end(), costs_symm.begin() + nr_edges);
 
     // Replace with symmetric version
     tails_ = std::move(tails_symm);
@@ -281,7 +282,7 @@ inline void Graph<VectorType>::ensure_symmetric()
 
     auto first = thrust::make_zip_iterator(thrust::make_tuple(tails_.begin(), heads_.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(tails_.end(), heads_.end()));
-    auto new_end = thrust::unique_by_key(first, last, costs_.begin());
+    auto new_end = thrust::unique_by_key(RAMA_THRUST_EXEC first, last, costs_.begin());
 
     size_t new_size = std::distance(first, new_end.first);
     tails_.resize(new_size);
@@ -302,40 +303,40 @@ inline void Graph<VectorType>::init(const bool is_sorted, const bool is_symmetri
     }
 
     if (is_sorted) {
-        assert(thrust::is_sorted(tails_.begin(), tails_.end()));
-        assert(thrust::is_sorted(thrust::make_zip_iterator(thrust::make_tuple(tails_.begin(), heads_.begin())),
+        assert(thrust::is_sorted(RAMA_THRUST_EXEC tails_.begin(), tails_.end()));
+        assert(thrust::is_sorted(RAMA_THRUST_EXEC thrust::make_zip_iterator(thrust::make_tuple(tails_.begin(), heads_.begin())),
                                  thrust::make_zip_iterator(thrust::make_tuple(tails_.end(), heads_.end()))));
     } else {
         coo_sort(tails_, heads_, costs_);
-        assert(thrust::is_sorted(tails_.begin(), tails_.end()));
+        assert(thrust::is_sorted(RAMA_THRUST_EXEC tails_.begin(), tails_.end()));
     }
 
     // Compute num_nodes from data if not provided
     if (num_nodes_ == 0) {
-        int max_tail = *thrust::max_element(tails_.begin(), tails_.end());
-        int max_head = *thrust::max_element(heads_.begin(), heads_.end());
+        int max_tail = *thrust::max_element(RAMA_THRUST_EXEC tails_.begin(), tails_.end());
+        int max_head = *thrust::max_element(RAMA_THRUST_EXEC heads_.begin(), heads_.end());
         num_nodes_ = std::max(max_tail, max_head) + 1;
     }
-    assert(num_nodes_ > *thrust::max_element(tails_.begin(), tails_.end()));
-    assert(num_nodes_ > *thrust::max_element(heads_.begin(), heads_.end()));
+    assert(num_nodes_ > *thrust::max_element(RAMA_THRUST_EXEC tails_.begin(), tails_.end()));
+    assert(num_nodes_ > *thrust::max_element(RAMA_THRUST_EXEC heads_.begin(), heads_.end()));
 }
 
 template<template<typename> class VectorType>
 inline float Graph<VectorType>::sum() const
 {
-    return thrust::reduce(costs_.begin(), costs_.end(), (float)0.0, thrust::plus<float>());
+    return thrust::reduce(RAMA_THRUST_EXEC costs_.begin(), costs_.end(), (float)0.0, thrust::plus<float>());
 }
 
 template<template<typename> class VectorType>
 inline float Graph<VectorType>::min() const
 {
-    return *thrust::min_element(costs_.begin(), costs_.end());
+    return *thrust::min_element(RAMA_THRUST_EXEC costs_.begin(), costs_.end());
 }
 
 template<template<typename> class VectorType>
 inline float Graph<VectorType>::max() const
 {
-    return *thrust::max_element(costs_.begin(), costs_.end());
+    return *thrust::max_element(RAMA_THRUST_EXEC costs_.begin(), costs_.end());
 }
 
 // Functor for self-loop check
@@ -352,7 +353,7 @@ inline void Graph<VectorType>::remove_self_loops()
     auto begin = thrust::make_zip_iterator(thrust::make_tuple(tails_.begin(), heads_.begin(), costs_.begin()));
     auto end = thrust::make_zip_iterator(thrust::make_tuple(tails_.end(), heads_.end(), costs_.end()));
 
-    auto new_last = thrust::remove_if(begin, end, is_self_loop());
+    auto new_last = thrust::remove_if(RAMA_THRUST_EXEC begin, end, is_self_loop());
     size_t new_size = std::distance(begin, new_last);
     tails_.resize(new_size);
     heads_.resize(new_size);
@@ -381,7 +382,7 @@ inline VectorType<float> Graph<VectorType>::self_loop_costs() const
     auto end = thrust::make_zip_iterator(thrust::make_tuple(tails_.end(), heads_.end(), costs_.end()));
 
     extract_self_loop_costs func{thrust::raw_pointer_cast(d.data())};
-    thrust::for_each(begin, end, func);
+    thrust::for_each(RAMA_THRUST_EXEC begin, end, func);
 
     return d;
 }
@@ -389,7 +390,7 @@ inline VectorType<float> Graph<VectorType>::self_loop_costs() const
 template<template<typename> class VectorType>
 inline VectorType<int> Graph<VectorType>::compute_offsets(const VectorType<int>& i, const int max_value) const
 {
-    assert(thrust::is_sorted(i.begin(), i.end()));
+    assert(thrust::is_sorted(RAMA_THRUST_EXEC i.begin(), i.end()));
 
     VectorType<int> offsets(max_value + 2, 0);
 
@@ -400,7 +401,7 @@ inline VectorType<int> Graph<VectorType>::compute_offsets(const VectorType<int>&
     auto first = i.begin();
     auto last = i.end();
 
-    auto new_end = thrust::unique_by_key_copy(first, last,
+    auto new_end = thrust::unique_by_key_copy(RAMA_THRUST_EXEC first, last,
                                                thrust::make_counting_iterator(0),
                                                unique_ids.begin(),
                                                counts.begin());
@@ -410,16 +411,16 @@ inline VectorType<int> Graph<VectorType>::compute_offsets(const VectorType<int>&
     counts.resize(num_unique + 1);
     counts[num_unique] = i.size();
 
-    thrust::adjacent_difference(counts.begin(), counts.end(), counts.begin());
+    thrust::adjacent_difference(RAMA_THRUST_EXEC counts.begin(), counts.end(), counts.begin());
     VectorType<int> final_counts(counts.begin() + 1, counts.end());
 
     // Scatter counts to appropriate positions
-    thrust::transform(unique_ids.begin(), unique_ids.end(),
+    thrust::transform(RAMA_THRUST_EXEC unique_ids.begin(), unique_ids.end(),
                      thrust::make_constant_iterator<int>(1),
                      unique_ids.begin(),
                      thrust::plus<int>());
-    thrust::scatter(final_counts.begin(), final_counts.end(), unique_ids.begin(), offsets.begin());
-    thrust::inclusive_scan(offsets.begin(), offsets.end(), offsets.begin());
+    thrust::scatter(RAMA_THRUST_EXEC final_counts.begin(), final_counts.end(), unique_ids.begin(), offsets.begin());
+    thrust::inclusive_scan(RAMA_THRUST_EXEC offsets.begin(), offsets.end(), offsets.begin());
 
     return offsets;
 }
@@ -451,7 +452,7 @@ inline Graph<VectorType> Graph<VectorType>::filter(const float lb, const float u
 {
     assert(lb <= ub);
 
-    const size_t new_count = thrust::count_if(costs_.begin(), costs_.end(), is_in_range_func{lb, ub});
+    const size_t new_count = thrust::count_if(RAMA_THRUST_EXEC costs_.begin(), costs_.end(), is_in_range_func{lb, ub});
     VectorType<int> tails_f(new_count), heads_f(new_count);
     VectorType<float> costs_f(new_count);
 
@@ -459,7 +460,7 @@ inline Graph<VectorType> Graph<VectorType>::filter(const float lb, const float u
     auto last = thrust::make_zip_iterator(thrust::make_tuple(tails_.end(), heads_.end(), costs_.end()));
     auto first_f = thrust::make_zip_iterator(thrust::make_tuple(tails_f.begin(), heads_f.begin(), costs_f.begin()));
 
-    thrust::copy_if(first, last, first_f, is_in_range_func{lb, ub});
+    thrust::copy_if(RAMA_THRUST_EXEC first, last, first_f, is_in_range_func{lb, ub});
 
     Graph<VectorType> result;
     result.num_nodes_ = num_nodes_;
@@ -483,10 +484,10 @@ inline Graph<VectorType> Graph<VectorType>::contract(const VectorType<int>& node
         return thrust::get<0>(t) < thrust::get<1>(t);
     };
 
-    const size_t num_forward = thrust::count_if(all_begin, all_end, is_fwd);
+    const size_t num_forward = thrust::count_if(RAMA_THRUST_EXEC all_begin, all_end, is_fwd);
 
     if (num_forward == 0) {
-        int new_num_nodes = *thrust::max_element(node_mapping.begin(), node_mapping.end()) + 1;
+        int new_num_nodes = *thrust::max_element(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end()) + 1;
         Graph<VectorType> result;
         result.num_nodes_ = new_num_nodes;
         return result;
@@ -496,12 +497,12 @@ inline Graph<VectorType> Graph<VectorType>::contract(const VectorType<int>& node
     VectorType<float> fwd_costs(num_forward);
 
     auto fwd_begin = thrust::make_zip_iterator(thrust::make_tuple(fwd_tails.begin(), fwd_heads.begin(), fwd_costs.begin()));
-    thrust::copy_if(all_begin, all_end, fwd_begin, is_fwd);
+    thrust::copy_if(RAMA_THRUST_EXEC all_begin, all_end, fwd_begin, is_fwd);
 
     // Step 2: Map endpoints through node_mapping
     VectorType<int> mapped_tails(num_forward), mapped_heads(num_forward);
-    thrust::gather(fwd_tails.begin(), fwd_tails.end(), node_mapping.begin(), mapped_tails.begin());
-    thrust::gather(fwd_heads.begin(), fwd_heads.end(), node_mapping.begin(), mapped_heads.begin());
+    thrust::gather(RAMA_THRUST_EXEC fwd_tails.begin(), fwd_tails.end(), node_mapping.begin(), mapped_tails.begin());
+    thrust::gather(RAMA_THRUST_EXEC fwd_heads.begin(), fwd_heads.end(), node_mapping.begin(), mapped_heads.begin());
 
     // Step 3: Normalize to (min, max) — some edges may become self-loops
     auto edge_begin = thrust::make_zip_iterator(thrust::make_tuple(mapped_tails.begin(), mapped_heads.begin()));
@@ -511,24 +512,24 @@ inline Graph<VectorType> Graph<VectorType>::contract(const VectorType<int>& node
         const int b = thrust::get<1>(t);
         return (a <= b) ? thrust::make_tuple(a, b) : thrust::make_tuple(b, a);
     };
-    thrust::transform(edge_begin, edge_end, edge_begin, normalize);
+    thrust::transform(RAMA_THRUST_EXEC edge_begin, edge_end, edge_begin, normalize);
 
     // Step 4: Sort by (tail, head)
-    thrust::sort_by_key(edge_begin, edge_end, fwd_costs.begin());
+    thrust::sort_by_key(RAMA_THRUST_EXEC edge_begin, edge_end, fwd_costs.begin());
 
     // Step 5: reduce_by_key to sum costs of edges with same mapped endpoints
     VectorType<int> out_tails(num_forward), out_heads(num_forward);
     VectorType<float> out_costs(num_forward);
 
     auto out_begin = thrust::make_zip_iterator(thrust::make_tuple(out_tails.begin(), out_heads.begin()));
-    auto new_end = thrust::reduce_by_key(edge_begin, edge_end, fwd_costs.begin(), out_begin, out_costs.begin());
+    auto new_end = thrust::reduce_by_key(RAMA_THRUST_EXEC edge_begin, edge_end, fwd_costs.begin(), out_begin, out_costs.begin());
 
     size_t new_size = std::distance(out_costs.begin(), new_end.second);
     out_tails.resize(new_size);
     out_heads.resize(new_size);
     out_costs.resize(new_size);
 
-    int new_num_nodes = *thrust::max_element(node_mapping.begin(), node_mapping.end()) + 1;
+    int new_num_nodes = *thrust::max_element(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end()) + 1;
 
     // is_symmetric=false triggers ensure_symmetric() to add reverse edges
     return Graph<VectorType>(new_num_nodes, std::move(out_tails), std::move(out_heads),

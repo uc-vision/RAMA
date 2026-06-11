@@ -18,6 +18,7 @@
 #include "multicut_text_parser.h"
 #include "rama_solver.h"
 #include "rama_utils.h"
+#include "torch_thrust_execution.h"
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
@@ -76,13 +77,13 @@ public:
     torch_tensor_vector(iterator first, iterator last)
         : tensor_(allocate_empty(static_cast<size_type>(thrust::distance(first, last))))
     {
-        thrust::copy(first, last, begin());
+        thrust::copy(RAMA_THRUST_EXEC first, last, begin());
     }
 
     torch_tensor_vector(const_iterator first, const_iterator last)
         : tensor_(allocate_empty(static_cast<size_type>(thrust::distance(first, last))))
     {
-        thrust::copy(first, last, begin());
+        thrust::copy(RAMA_THRUST_EXEC first, last, begin());
     }
 
     torch_tensor_vector(const torch_tensor_vector& other)

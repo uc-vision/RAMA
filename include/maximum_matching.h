@@ -15,6 +15,7 @@
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/tuple.h>
 #include "graph.h"
+#include "torch_thrust_execution.h"
 
 #ifdef __CUDACC__
 #define MM_HOST_DEVICE __host__ __device__
@@ -48,7 +49,7 @@ inline float determine_matching_threshold(const Graph<VectorType>& A, const floa
             thrust::get<1>(t1) + thrust::get<1>(t2));
     };
 
-    auto red = thrust::transform_reduce(first, last,
+    auto red = thrust::transform_reduce(RAMA_THRUST_EXEC first, last,
         pos_part, thrust::make_tuple(0, 0.0f), tuple_sum);
     if (thrust::get<0>(red) == 0)
         return -1.0f;
@@ -71,7 +72,7 @@ inline std::tuple<VectorType<int>, int> filter_edges_by_matching(
     const int num_nodes = A.num_nodes();
 
     VectorType<int> node_mapping(num_nodes);
-    thrust::sequence(node_mapping.begin(), node_mapping.end(), 0);
+    thrust::sequence(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end(), 0);
 
     const float min_edge_weight_to_match = mm_detail::determine_matching_threshold(A, mean_multiplier_mm);
     if (verbose)
@@ -91,16 +92,16 @@ inline std::tuple<VectorType<int>, int> filter_edges_by_matching(
     int prev_num_matched = 0;
     for (int t = 0; t < 10; t++)
     {
-        thrust::fill(still_running.begin(), still_running.end(), 0);
+        thrust::fill(RAMA_THRUST_EXEC still_running.begin(), still_running.end(), 0);
 
         // Phase 1: pick best neighbour for each unmatched vertex
         {
-            thrust::fill(v_best_neighbours.begin(), v_best_neighbours.end(), -1);
+            thrust::fill(RAMA_THRUST_EXEC v_best_neighbours.begin(), v_best_neighbours.end(), -1);
             const int* matched_ptr = thrust::raw_pointer_cast(v_matched.data());
             int* best_ptr = thrust::raw_pointer_cast(v_best_neighbours.data());
             const float thresh = min_edge_weight_to_match;
 
-            thrust::for_each(
+            thrust::for_each(RAMA_THRUST_EXEC 
                 thrust::make_counting_iterator(0),
                 thrust::make_counting_iterator(num_nodes),
                 [offsets_ptr, heads_ptr, costs_ptr, matched_ptr, best_ptr, thresh]
@@ -128,7 +129,7 @@ inline std::tuple<VectorType<int>, int> filter_edges_by_matching(
             const int* best_ptr = thrust::raw_pointer_cast(v_best_neighbours.data());
             int* still_running_ptr = thrust::raw_pointer_cast(still_running.data());
 
-            thrust::for_each(
+            thrust::for_each(RAMA_THRUST_EXEC 
                 thrust::make_counting_iterator(0),
                 thrust::make_counting_iterator(num_nodes),
                 [best_ptr, matched_ptr, mapping_ptr, still_running_ptr]
@@ -149,7 +150,7 @@ inline std::tuple<VectorType<int>, int> filter_edges_by_matching(
                 });
         }
 
-        int current_num_matched = thrust::reduce(v_matched.begin(), v_matched.end(), 0);
+        int current_num_matched = thrust::reduce(RAMA_THRUST_EXEC v_matched.begin(), v_matched.end(), 0);
         float rel_increase = (current_num_matched - prev_num_matched) / (prev_num_matched + 1.0f);
         if (verbose)
             std::cout << "matched sum: " << current_num_matched

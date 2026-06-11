@@ -15,6 +15,7 @@
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/extrema.h>
 #include "find_triangles.h" // for cc_detail::count_common_neighbours
+#include "torch_thrust_execution.h"
 
 namespace qd_detail {
 
@@ -115,8 +116,8 @@ void deduplicate_triangles(
     auto last = thrust::make_zip_iterator(
         thrust::make_tuple(tri_v1.end(), tri_v2.end(), tri_v3.end()));
 
-    thrust::sort(first, last);
-    auto new_last = thrust::unique(first, last);
+    thrust::sort(RAMA_THRUST_EXEC first, last);
+    auto new_last = thrust::unique(RAMA_THRUST_EXEC first, last);
     const auto new_size = thrust::distance(first, new_last);
 
     tri_v1.resize(new_size);
@@ -157,7 +158,7 @@ find_quadrangles(
 
     // Pass 1: count triangles per repulsive edge.
     VectorType<int> counts(num_rep_edges);
-    thrust::transform(
+    thrust::transform(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(num_rep_edges),
         counts.begin(),
@@ -168,13 +169,13 @@ find_quadrangles(
                 pos_offsets_ptr, pos_heads_ptr);
         });
 
-    const int total_triangles = thrust::reduce(counts.begin(), counts.end());
+    const int total_triangles = thrust::reduce(RAMA_THRUST_EXEC counts.begin(), counts.end());
     if (total_triangles == 0)
         return {VectorType<int>(), VectorType<int>(), VectorType<int>()};
 
     // Compute write offsets via exclusive scan.
     VectorType<int> offsets(num_rep_edges);
-    thrust::exclusive_scan(counts.begin(), counts.end(), offsets.begin());
+    thrust::exclusive_scan(RAMA_THRUST_EXEC counts.begin(), counts.end(), offsets.begin());
 
     // Allocate output.
     VectorType<int> tri_v1(total_triangles);
@@ -187,7 +188,7 @@ find_quadrangles(
     const int* offsets_ptr = thrust::raw_pointer_cast(offsets.data());
 
     // Pass 2: fill triangles at computed offsets.
-    thrust::for_each(
+    thrust::for_each(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(num_rep_edges),
         [tails_ptr, heads_ptr, pos_offsets_ptr, pos_heads_ptr,

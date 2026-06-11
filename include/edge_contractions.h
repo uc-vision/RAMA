@@ -36,6 +36,7 @@
 #include "connected_components.h"
 #include "rama_utils.h"
 #include "time_measure_util.h"
+#include "torch_thrust_execution.h"
 
 #ifdef __CUDACC__
 #define EC_HOST_DEVICE __host__ __device__
@@ -62,7 +63,7 @@ struct frontier {
           bottleneck_indices(seeds.size(), 0),
           bottleneck_values(seeds.size(), std::numeric_limits<float>::max())
     {
-        thrust::sequence(rep_edges.begin(), rep_edges.end());
+        thrust::sequence(RAMA_THRUST_EXEC rep_edges.begin(), rep_edges.end());
     }
 
     frontier(VectorType<int>&& _nodes, VectorType<int>&& _parent_nodes,
@@ -138,14 +139,14 @@ void expand_frontier(
 
     // Get degree for each frontier node
     VectorType<int> v_frontier_num_neighbours(f.size());
-    thrust::gather(f.nodes.begin(), f.nodes.end(), mst_node_degrees.begin(), v_frontier_num_neighbours.begin());
+    thrust::gather(RAMA_THRUST_EXEC f.nodes.begin(), f.nodes.end(), mst_node_degrees.begin(), v_frontier_num_neighbours.begin());
 
     // Subtract 1 for parent (except for seeds where parent == -1)
     {
         const int* parent_ptr = thrust::raw_pointer_cast(f.parent_nodes.data());
         int* degree_ptr = thrust::raw_pointer_cast(v_frontier_num_neighbours.data());
         const int n = f.size();
-        thrust::for_each(
+        thrust::for_each(RAMA_THRUST_EXEC 
             thrust::make_counting_iterator(0),
             thrust::make_counting_iterator(n),
             [parent_ptr, degree_ptr] EC_HOST_DEVICE (int idx) {
@@ -181,7 +182,7 @@ void expand_frontier(
         float* exp_bn_value_ptr = thrust::raw_pointer_cast(expanded_bottleneck_edge_value.data());
 
         const int n = f.size();
-        thrust::for_each(
+        thrust::for_each(RAMA_THRUST_EXEC 
             thrust::make_counting_iterator(0),
             thrust::make_counting_iterator(n),
             [row_offsets_ptr, col_ids_ptr, costs_ptr,
@@ -247,7 +248,7 @@ bool filter_cycles(
         row_frontier.parent_nodes.begin(),
         row_frontier.bottleneck_indices.begin(),
         row_frontier.bottleneck_values.begin()));
-    thrust::sort_by_key(first_row_key, last_row_key, first_row_val);
+    thrust::sort_by_key(RAMA_THRUST_EXEC first_row_key, last_row_key, first_row_val);
 
     auto first_col_key = thrust::make_zip_iterator(thrust::make_tuple(
         col_frontier.nodes.begin(), col_frontier.rep_edges.begin()));
@@ -257,7 +258,7 @@ bool filter_cycles(
         col_frontier.parent_nodes.begin(),
         col_frontier.bottleneck_indices.begin(),
         col_frontier.bottleneck_values.begin()));
-    thrust::sort_by_key(first_col_key, last_col_key, first_col_val);
+    thrust::sort_by_key(RAMA_THRUST_EXEC first_col_key, last_col_key, first_col_val);
 
     // Merge and search for duplicates
     const size_t total_size = row_frontier.size() + col_frontier.size();
@@ -296,7 +297,7 @@ bool filter_cycles(
         v_bottleneck_index_reduced.begin(), thrust::make_discard_iterator(), num_occ.begin()));
 
     thrust::equal_to<thrust::tuple<int, int>> binary_pred_comp;
-    auto last_reduce = thrust::reduce_by_key(
+    auto last_reduce = thrust::reduce_by_key(RAMA_THRUST_EXEC 
         first_merged_key, last_merged.first, first_merged_val_with_count,
         reduced_key_first, reduced_val_first, binary_pred_comp, reduce_intersecting_paths());
     int num_reduced = std::distance(reduced_key_first, last_reduce.first);
@@ -311,7 +312,7 @@ bool filter_cycles(
     auto last_mst_remove = thrust::make_zip_iterator(thrust::make_tuple(
         mst_edges_to_remove.end(), v_rep_edges_reduced.end(), num_occ.end()));
 
-    auto last_mst_remove_valid = thrust::remove_if(first_mst_remove, last_mst_remove, single_occurence());
+    auto last_mst_remove_valid = thrust::remove_if(RAMA_THRUST_EXEC first_mst_remove, last_mst_remove, single_occurence());
     int num_directed_edges_to_remove = std::distance(first_mst_remove, last_mst_remove_valid);
 
     if (num_directed_edges_to_remove == 0)
@@ -319,16 +320,16 @@ bool filter_cycles(
 
     mst_edges_to_remove.resize(num_directed_edges_to_remove);
 
-    thrust::sort(mst_edges_to_remove.begin(), mst_edges_to_remove.end());
-    auto last_mst_unique = thrust::unique(mst_edges_to_remove.begin(), mst_edges_to_remove.end());
+    thrust::sort(RAMA_THRUST_EXEC mst_edges_to_remove.begin(), mst_edges_to_remove.end());
+    auto last_mst_unique = thrust::unique(RAMA_THRUST_EXEC mst_edges_to_remove.begin(), mst_edges_to_remove.end());
     mst_edges_to_remove.resize(std::distance(mst_edges_to_remove.begin(), last_mst_unique));
 
     // Remove bottleneck edges (in both directions) from MST
     VectorType<int> mst_i_to_remove(mst_edges_to_remove.size());
     VectorType<int> mst_j_to_remove(mst_edges_to_remove.size());
-    thrust::gather(mst_edges_to_remove.begin(), mst_edges_to_remove.end(),
+    thrust::gather(RAMA_THRUST_EXEC mst_edges_to_remove.begin(), mst_edges_to_remove.end(),
                    mst_row_ids.begin(), mst_i_to_remove.begin());
-    thrust::gather(mst_edges_to_remove.begin(), mst_edges_to_remove.end(),
+    thrust::gather(RAMA_THRUST_EXEC mst_edges_to_remove.begin(), mst_edges_to_remove.end(),
                    mst_col_ids.begin(), mst_j_to_remove.begin());
     std::tie(mst_i_to_remove, mst_j_to_remove) = to_undirected<VectorType>(mst_i_to_remove, mst_j_to_remove);
     coo_sorting<VectorType>(mst_i_to_remove, mst_j_to_remove);
@@ -391,7 +392,7 @@ int filter_by_cc(
     auto first_rep = thrust::make_zip_iterator(thrust::make_tuple(rep_row_ids.begin(), rep_col_ids.begin()));
     auto last_rep = thrust::make_zip_iterator(thrust::make_tuple(rep_row_ids.end(), rep_col_ids.end()));
 
-    auto last_valid = thrust::remove_if(first_rep, last_rep,
+    auto last_valid = thrust::remove_if(RAMA_THRUST_EXEC first_rep, last_rep,
         [cc_ptr] EC_HOST_DEVICE (const thrust::tuple<int, int>& t) {
             return cc_ptr[thrust::get<0>(t)] != cc_ptr[thrust::get<1>(t)];
         });
@@ -418,7 +419,7 @@ bool filter_by_thresholding(
         thrust::constant_iterator<int>(1), mst_data.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(
         thrust::constant_iterator<int>(1) + mst_data.size(), mst_data.end()));
-    auto red = thrust::transform_reduce(first, last, pos_part(), thrust::make_tuple(0, 0.0f), tuple_sum());
+    auto red = thrust::transform_reduce(RAMA_THRUST_EXEC first, last, pos_part(), thrust::make_tuple(0, 0.0f), tuple_sum());
     const float min_thresh = mean_multiplier * thrust::get<1>(red) / thrust::get<0>(red);
 
     auto first_mst = thrust::make_zip_iterator(thrust::make_tuple(
@@ -426,7 +427,7 @@ bool filter_by_thresholding(
     auto last_mst = thrust::make_zip_iterator(thrust::make_tuple(
         mst_row_ids.end(), mst_col_ids.end(), mst_data.end()));
 
-    auto last_mst_valid = thrust::remove_if(first_mst, last_mst, is_below_thresh_func({min_thresh}));
+    auto last_mst_valid = thrust::remove_if(RAMA_THRUST_EXEC first_mst, last_mst, is_below_thresh_func({min_thresh}));
     const int new_size = std::distance(first_mst, last_mst_valid);
     if (new_size == (int)mst_row_ids.size())
         return false;
@@ -488,7 +489,7 @@ std::tuple<VectorType<int>, int> find_contraction_mapping(
             rep_tails.begin(), rep_heads.begin()));
         auto last_rep_zip = thrust::make_zip_iterator(thrust::make_tuple(
             rep_tails.end(), rep_heads.end()));
-        auto last_valid = thrust::remove_if(first_rep_zip, last_rep_zip, ec_detail::is_reverse_edge());
+        auto last_valid = thrust::remove_if(RAMA_THRUST_EXEC first_rep_zip, last_rep_zip, ec_detail::is_reverse_edge());
         int num_single = std::distance(first_rep_zip, last_valid);
         rep_tails.resize(num_single);
         rep_heads.resize(num_single);
@@ -565,7 +566,7 @@ std::tuple<VectorType<int>, int> find_contraction_mapping(
 
     // 7. Return contraction mapping
     VectorType<int> node_mapping = compress_label_sequence<VectorType>(cc_labels, cc_labels.size() - 1);
-    int nr_ccs = *thrust::max_element(node_mapping.begin(), node_mapping.end()) + 1;
+    int nr_ccs = *thrust::max_element(RAMA_THRUST_EXEC node_mapping.begin(), node_mapping.end()) + 1;
     if (verbose)
         std::cout << "Found conflict-free contraction mapping with: " << nr_ccs << " connected components\n";
 

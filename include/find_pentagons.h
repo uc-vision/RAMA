@@ -11,6 +11,7 @@
 #include <thrust/reduce.h>
 #include <thrust/iterator/counting_iterator.h>
 #include "find_quadrangles.h" // for deduplicate_triangles, qd_detail::write_sorted_triangle
+#include "torch_thrust_execution.h"
 
 namespace pent_detail {
 
@@ -164,7 +165,7 @@ find_pentagons(
 
     // Pass 1: count triangles per repulsive edge.
     VectorType<std::int64_t> counts(num_rep_edges);
-    thrust::transform(
+    thrust::transform(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(num_rep_edges),
         counts.begin(),
@@ -175,14 +176,14 @@ find_pentagons(
                 pos_offsets_ptr, pos_heads_ptr);
         });
 
-    const std::int64_t total_triangles = thrust::reduce(
+    const std::int64_t total_triangles = thrust::reduce(RAMA_THRUST_EXEC 
         counts.begin(), counts.end(), std::int64_t{0}, thrust::plus<std::int64_t>());
     if (total_triangles == 0)
         return {VectorType<int>(), VectorType<int>(), VectorType<int>()};
 
     // Compute write offsets via exclusive scan.
     VectorType<std::int64_t> offsets(num_rep_edges);
-    thrust::exclusive_scan(counts.begin(), counts.end(), offsets.begin());
+    thrust::exclusive_scan(RAMA_THRUST_EXEC counts.begin(), counts.end(), offsets.begin());
 
     // Allocate output.
     const auto triangle_count = static_cast<size_t>(total_triangles);
@@ -196,7 +197,7 @@ find_pentagons(
     const std::int64_t* offsets_ptr = thrust::raw_pointer_cast(offsets.data());
 
     // Pass 2: fill triangles at computed offsets.
-    thrust::for_each(
+    thrust::for_each(RAMA_THRUST_EXEC 
         thrust::make_counting_iterator(0),
         thrust::make_counting_iterator(num_rep_edges),
         [tails_ptr, heads_ptr, pos_offsets_ptr, pos_heads_ptr,

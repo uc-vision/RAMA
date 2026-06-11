@@ -104,8 +104,7 @@ class CMakeBuild(build_ext):
         if build_with_torch.upper() == 'ON':
             print("Building with torch")
             cmake_args += ['-DWITH_TORCH=ON']
-            import torch
-            cmake_args += ['-DCMAKE_PREFIX_PATH='+torch.utils.cmake_prefix_path]
+            cmake_args += ['-DCMAKE_PREFIX_PATH='+sys.prefix]
             print(cmake_args)
         self._prepare_environment()
         env = os.environ.copy()

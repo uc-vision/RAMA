@@ -6,6 +6,7 @@
 #include "maximum_matching.h"
 #include "multicut_message_passing.h"
 #include "multicut_solver_options.h"
+#include "persistency_preprocessor.h"
 #include "rama_utils.h"
 #include "time_measure_util.h"
 
@@ -76,6 +77,19 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
     MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME;
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
+    VectorType<int> node_mapping(G.num_nodes());
+    thrust::sequence(node_mapping.begin(), node_mapping.end());
+
+    std::vector<std::vector<int>> timeline;
+
+    if (opts.run_preprocessor)
+    {
+        VectorType<int> preprocessor_mapping = persistency_preprocess<VectorType>(G, opts, -1);
+        rama_solver_detail::map_node_labels<VectorType>(preprocessor_mapping, node_mapping);
+        if (opts.verbose)
+            std::cout << "Energy after preprocessor = " << G.sum() << "\n";
+    }
+
     // Dual solve for lower bound (reparametrizes G in-place)
     const double final_lb = dual_solver<VectorType>(G,
         opts.max_cycle_length_lb, opts.num_dual_itr_lb,
@@ -83,11 +97,6 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
 
     if (opts.verbose)
         std::cout << "initial energy = " << G.sum() << "\n";
-
-    VectorType<int> node_mapping(G.num_nodes());
-    thrust::sequence(node_mapping.begin(), node_mapping.end());
-
-    std::vector<std::vector<int>> timeline;
 
     if (opts.only_compute_lb)
         return {VectorType<int>(), final_lb, timeline};
@@ -161,6 +170,12 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
                       << ", #components = " << G.num_nodes() << "\n";
 
         rama_solver_detail::map_node_labels<VectorType>(cur_node_mapping, node_mapping);
+
+        if (opts.run_preprocessor && opts.preprocessor_each_step)
+        {
+            VectorType<int> preprocessor_mapping = persistency_preprocess<VectorType>(G, opts, 1);
+            rama_solver_detail::map_node_labels<VectorType>(preprocessor_mapping, node_mapping);
+        }
 
         if (opts.dump_timeline)
         {

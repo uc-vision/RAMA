@@ -98,14 +98,9 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j8']
-        build_with_torch = os.environ.get("WITH_TORCH", "ON")
-        print(f"build_with_torch:{build_with_torch}\n\n")
-
-        if build_with_torch.upper() == 'ON':
-            print("Building with torch")
-            cmake_args += ['-DWITH_TORCH=ON']
-            cmake_args += ['-DCMAKE_PREFIX_PATH='+sys.prefix]
-            print(cmake_args)
+        print("Building with torch")
+        cmake_args += ['-DCMAKE_PREFIX_PATH='+sys.prefix]
+        print(cmake_args)
         self._prepare_environment()
         env = os.environ.copy()
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),

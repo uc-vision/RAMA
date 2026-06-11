@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <tuple>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -24,7 +25,7 @@ inline void write_sorted_triangle(
     int* const __restrict__ tri_v1,
     int* const __restrict__ tri_v2,
     int* const __restrict__ tri_v3,
-    const long long idx)
+    const std::int64_t idx)
 {
     const int min_v = thrust::min(a, thrust::min(b, c));
     const int max_v = thrust::max(a, thrust::max(b, c));

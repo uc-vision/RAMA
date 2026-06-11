@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -32,31 +33,13 @@ torch::ScalarType torch_scalar_type()
 {
     if constexpr (std::is_same_v<T, int>)
         return torch::kInt32;
-    else if constexpr (std::is_same_v<T, long long>)
+    else if constexpr (std::is_same_v<T, std::int64_t>)
         return torch::kInt64;
     else if constexpr (std::is_same_v<T, float>)
         return torch::kFloat32;
     else
-        static_assert(std::is_same_v<T, int> || std::is_same_v<T, long long> || std::is_same_v<T, float>,
+        static_assert(std::is_same_v<T, int> || std::is_same_v<T, std::int64_t> || std::is_same_v<T, float>,
                       "Unsupported torch_tensor_vector element type");
-}
-
-template <typename T>
-T* tensor_data_ptr(torch::Tensor& tensor)
-{
-    if constexpr (std::is_same_v<T, long long>)
-        return reinterpret_cast<T*>(tensor.data_ptr<int64_t>());
-    else
-        return tensor.data_ptr<T>();
-}
-
-template <typename T>
-const T* tensor_data_ptr(const torch::Tensor& tensor)
-{
-    if constexpr (std::is_same_v<T, long long>)
-        return reinterpret_cast<const T*>(tensor.data_ptr<int64_t>());
-    else
-        return tensor.data_ptr<T>();
 }
 
 thread_local int torch_tensor_vector_device = 0;
@@ -117,7 +100,7 @@ public:
 
     iterator begin()
     {
-        return thrust::device_pointer_cast(tensor_data_ptr<T>(tensor_));
+        return thrust::device_pointer_cast(tensor_.data_ptr<T>());
     }
 
     iterator end()
@@ -127,7 +110,7 @@ public:
 
     const_iterator begin() const
     {
-        return thrust::device_pointer_cast(tensor_data_ptr<T>(tensor_));
+        return thrust::device_pointer_cast(static_cast<const T*>(tensor_.data_ptr<T>()));
     }
 
     const_iterator end() const

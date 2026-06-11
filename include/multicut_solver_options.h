@@ -17,7 +17,7 @@ struct multicut_solver_options {
     bool dump_timeline = false;
     bool verbose = true;
     bool sanitize_graph = false; 
-    bool run_preprocessor = true;
+    bool run_preprocessor = false;
     bool preprocessor_each_step = false;
     float preprocessor_threshold = 0.005f;
 
@@ -69,7 +69,7 @@ struct multicut_solver_options {
         const bool _dump_timeline = false,
         const bool _sanitize_graph = false,
         const float _preprocessor_threshold = 0.005f,
-        const bool _run_preprocessor = true,
+        const bool _run_preprocessor = false,
         const bool _preprocessor_each_step = false) :
         max_cycle_length_lb(_max_cycle_length_lb), 
         num_dual_itr_lb(_num_dual_itr_lb), 
@@ -106,7 +106,7 @@ struct multicut_solver_options {
         app.add_flag("--only_lb", only_compute_lb, "Only compute the lower bound. (Default: false).");
         app.add_flag("--dump_timeline", dump_timeline, "Return the output of each contraction step. Only use for debugging/visualization purposes. (slow). (Default: false).");
         app.add_flag("--sanitize_graph", sanitize_graph, "If the input graph contains nodes without any edges and thus needs sanitizing. Cluster labels in this case will be -1 for these nodes. (Default: false).");
-        app.add_flag("--run_preprocessor", run_preprocessor, "Run persistency preprocessing before RAMA. (Default: true).");
+        app.add_flag("--run_preprocessor", run_preprocessor, "Run persistency preprocessing before RAMA. (Default: false).");
         app.add_flag("--preprocessor_each_step", preprocessor_each_step, "Run one persistency preprocessing pass after each RAMA contraction step. (Default: false).");
         try {
             app.parse(argc, argv);

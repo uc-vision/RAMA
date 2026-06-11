@@ -19,7 +19,7 @@ struct multicut_solver_options {
     bool sanitize_graph = false;
     // =========== Preprocessor ============//
     bool run_preprocessor = true;
-    bool preprocessor_each_step = true;
+    bool preprocessor_each_step = false;
     float preprocessor_threshold = 0.005;
 
 
@@ -72,7 +72,7 @@ struct multicut_solver_options {
         const bool _dump_timeline = false,
         const bool _sanitize_graph = false,
         const bool _run_preprocessor = true,
-        const bool _preprocessor_each_step = true) :
+        const bool _preprocessor_each_step = false) :
         max_cycle_length_lb(_max_cycle_length_lb), 
         num_dual_itr_lb(_num_dual_itr_lb), 
         max_cycle_length_primal(_max_cycle_length_primal), 

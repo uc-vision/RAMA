@@ -61,7 +61,7 @@ public:
         thrust::fill(begin(), end(), value);
     }
 
-    template <typename Iterator>
+    template <typename Iterator, typename = std::enable_if_t<!std::is_integral_v<Iterator>>>
     torch_tensor_vector(Iterator first, Iterator last)
         : tensor_(allocate_tensor(std::distance(first, last)))
     {

@@ -2,7 +2,6 @@
 #include <chrono>
 #include <cstdint>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -29,18 +28,22 @@ namespace py = pybind11;
 namespace {
 
 template <typename T>
-torch::ScalarType torch_scalar_type()
-{
-    if constexpr (std::is_same_v<T, int>)
-        return torch::kInt32;
-    else if constexpr (std::is_same_v<T, std::int64_t>)
-        return torch::kInt64;
-    else if constexpr (std::is_same_v<T, float>)
-        return torch::kFloat32;
-    else
-        static_assert(std::is_same_v<T, int> || std::is_same_v<T, std::int64_t> || std::is_same_v<T, float>,
-                      "Unsupported torch_tensor_vector element type");
-}
+struct torch_tensor_traits;
+
+template <>
+struct torch_tensor_traits<int> {
+    static constexpr torch::ScalarType dtype = torch::kInt32;
+};
+
+template <>
+struct torch_tensor_traits<std::int64_t> {
+    static constexpr torch::ScalarType dtype = torch::kInt64;
+};
+
+template <>
+struct torch_tensor_traits<float> {
+    static constexpr torch::ScalarType dtype = torch::kFloat32;
+};
 
 thread_local int torch_tensor_vector_device = 0;
 
@@ -70,8 +73,13 @@ public:
         : tensor_(std::move(tensor))
     {}
 
-    template <typename Iterator, typename = std::enable_if_t<!std::is_integral_v<Iterator>>>
-    torch_tensor_vector(Iterator first, Iterator last)
+    torch_tensor_vector(iterator first, iterator last)
+        : tensor_(allocate_empty(static_cast<size_type>(thrust::distance(first, last))))
+    {
+        thrust::copy(first, last, begin());
+    }
+
+    torch_tensor_vector(const_iterator first, const_iterator last)
         : tensor_(allocate_empty(static_cast<size_type>(thrust::distance(first, last))))
     {
         thrust::copy(first, last, begin());
@@ -110,7 +118,7 @@ public:
 
     const_iterator begin() const
     {
-        return thrust::device_pointer_cast(static_cast<const T*>(tensor_.data_ptr<T>()));
+        return thrust::device_pointer_cast(tensor_.const_data_ptr<T>());
     }
 
     const_iterator end() const
@@ -197,7 +205,7 @@ private:
     {
         return torch::TensorOptions()
             .device(torch::Device(torch::kCUDA, torch_tensor_vector_device))
-            .dtype(torch_scalar_type<T>());
+            .dtype(torch_tensor_traits<T>::dtype);
     }
 
     static torch::Tensor allocate_empty(const size_type count)

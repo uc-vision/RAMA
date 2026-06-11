@@ -6,7 +6,6 @@
 #include "maximum_matching.h"
 #include "multicut_message_passing.h"
 #include "multicut_solver_options.h"
-#include "persistency_preprocessor.h"
 #include "rama_utils.h"
 #include "time_measure_util.h"
 
@@ -81,14 +80,6 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
     thrust::sequence(node_mapping.begin(), node_mapping.end());
 
     std::vector<std::vector<int>> timeline;
-
-    if (opts.run_preprocessor)
-    {
-        VectorType<int> preprocessor_mapping = persistency_preprocess<VectorType>(G, opts, -1);
-        rama_solver_detail::map_node_labels<VectorType>(preprocessor_mapping, node_mapping);
-        if (opts.verbose)
-            std::cout << "Energy after preprocessor = " << G.sum() << "\n";
-    }
 
     if (G.num_directed_edges() == 0)
         return {opts.only_compute_lb ? VectorType<int>() : node_mapping, 0.0, timeline};
@@ -173,12 +164,6 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
                       << ", #components = " << G.num_nodes() << "\n";
 
         rama_solver_detail::map_node_labels<VectorType>(cur_node_mapping, node_mapping);
-
-        if (opts.run_preprocessor && opts.preprocessor_each_step)
-        {
-            VectorType<int> preprocessor_mapping = persistency_preprocess<VectorType>(G, opts, 1);
-            rama_solver_detail::map_node_labels<VectorType>(preprocessor_mapping, node_mapping);
-        }
 
         if (opts.dump_timeline)
         {

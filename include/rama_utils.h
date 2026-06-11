@@ -276,7 +276,8 @@ struct sort_edge_nodes_func
         }
 };
 
-inline void sort_edge_nodes(thrust::device_vector<int>& i, thrust::device_vector<int>& j)
+template<template<typename> class VectorType>
+inline void sort_edge_nodes(VectorType<int>& i, VectorType<int>& j)
 {
     assert(i.size() == j.size());
 
@@ -468,7 +469,7 @@ inline void map_old_values_consec(VectorType<int>& src,
 inline thrust::device_vector<int> compute_sanitized_graph(thrust::device_vector<int>& i, thrust::device_vector<int>& j, thrust::device_vector<float>& data)
 {
     // First find and remove duplicate edges. The corresponding costs are also discarded!
-    sort_edge_nodes(i, j);
+    sort_edge_nodes<thrust::device_vector>(i, j);
 
     coo_sorting<thrust::device_vector>(i, j, data);
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));

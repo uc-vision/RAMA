@@ -90,6 +90,9 @@ rama_solver(Graph<VectorType>& G, const multicut_solver_options& opts)
             std::cout << "Energy after preprocessor = " << G.sum() << "\n";
     }
 
+    if (G.num_directed_edges() == 0)
+        return {opts.only_compute_lb ? VectorType<int>() : node_mapping, 0.0, timeline};
+
     // Dual solve for lower bound (reparametrizes G in-place)
     const double final_lb = dual_solver<VectorType>(G,
         opts.max_cycle_length_lb, opts.num_dual_itr_lb,

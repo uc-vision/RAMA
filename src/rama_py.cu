@@ -80,7 +80,9 @@ public:
         : tensor_(other.tensor_.clone())
     {}
 
-    torch_tensor_vector(torch_tensor_vector&& other) noexcept = default;
+    __host__ torch_tensor_vector(torch_tensor_vector&& other) noexcept
+        : tensor_(std::move(other.tensor_))
+    {}
 
     torch_tensor_vector& operator=(const torch_tensor_vector& other)
     {
@@ -89,7 +91,11 @@ public:
         return *this;
     }
 
-    torch_tensor_vector& operator=(torch_tensor_vector&& other) noexcept = default;
+    __host__ torch_tensor_vector& operator=(torch_tensor_vector&& other) noexcept
+    {
+        tensor_ = std::move(other.tensor_);
+        return *this;
+    }
 
     iterator begin()
     {

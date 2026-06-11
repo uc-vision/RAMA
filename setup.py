@@ -112,9 +112,9 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.', '--target', ext.name] + build_args, cwd=self.build_temp)
 
 setup(
-    name='RAMA',
+    name='rama-torch',
     version='0.0.17',
-    description='Bindings for RAMA: Rapid algorithm for multicut.',
+    description='Torch-native bindings for RAMA: Rapid algorithm for multicut.',
     packages=find_packages('.'),
     ext_modules=[CMakeExtension(name='rama_py')],
     cmdclass=dict(build_ext=CMakeBuild),

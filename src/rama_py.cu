@@ -80,9 +80,9 @@ PYBIND11_MODULE(rama_py, m) {
     py::class_<multicut_solver_options>(m, "multicut_solver_options")
         .def(py::init<>())
         .def(py::init<const std::string&>())
-        .def(py::init<const int&, const int&, const int&, const int&, const int&, 
-                const float&, const float&, const float&, 
-                const bool&, const int&, const bool&>())
+        .def(py::init<const int&, const int&, const int&, const int&, const int&,
+                const float&, const float&, const float&, const float&,
+                const bool&, const int&, const bool&, const bool&, const bool&>())
         .def_readwrite("max_cycle_length_lb", &multicut_solver_options::max_cycle_length_lb)
         .def_readwrite("num_dual_itr_lb", &multicut_solver_options::num_dual_itr_lb)
         .def_readwrite("max_cycle_length_primal", &multicut_solver_options::max_cycle_length_primal)
@@ -91,12 +91,14 @@ PYBIND11_MODULE(rama_py, m) {
         .def_readwrite("mean_multiplier_mm", &multicut_solver_options::mean_multiplier_mm)
         .def_readwrite("matching_thresh_crossover_ratio", &multicut_solver_options::matching_thresh_crossover_ratio)
         .def_readwrite("tri_memory_factor", &multicut_solver_options::tri_memory_factor)
+        .def_readwrite("preprocessor_threshold", &multicut_solver_options::preprocessor_threshold)
         .def_readwrite("only_compute_lb", &multicut_solver_options::only_compute_lb)
         .def_readwrite("max_time_sec", &multicut_solver_options::max_time_sec)
         .def_readwrite("verbose", &multicut_solver_options::verbose)
         .def_readwrite("dump_timeline", &multicut_solver_options::dump_timeline)
         .def_readwrite("sanitize_graph", &multicut_solver_options::sanitize_graph)
-	.def_readwrite("dump_timeline", &multicut_solver_options::dump_timeline)
+        .def_readwrite("run_preprocessor", &multicut_solver_options::run_preprocessor)
+        .def_readwrite("preprocessor_each_step", &multicut_solver_options::preprocessor_each_step)
         .def("__repr__", [](const multicut_solver_options &a) {
             return a.get_string();
         });
@@ -122,4 +124,3 @@ PYBIND11_MODULE(rama_py, m) {
 		m.def("rama_torch", &rama_torch, "RAMA CUDA solver with torch interface.");
 	#endif
 }
-

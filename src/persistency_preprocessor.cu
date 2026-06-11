@@ -277,17 +277,19 @@ thrust::device_vector<float> calculate_contracting_edges(dCOO& A, const thrust::
     MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME;
 
     auto contracting_edges_edge_criterion = calculate_contracting_edges_edge_criterion(A, node_costs);
-    auto edges = contracting_edges_edge_criterion;
-    // Use this instead of the above line to combine edge and triangle criterion (generally no significant gain in persistency for high computational cost)
-    // auto contracting_edges_triangle_criterion = calculate_contracting_edges_triangle_criterion(A, node_costs, opts.max_cycle_length_lb, opts.tri_memory_factor, opts.verbose)
-    // thrust::device_vector<float> edges(contracting_edges_edge_criterion.size());
-    // thrust::transform(contracting_edges_edge_criterion.begin(), contracting_edges_edge_criterion.end(), contracting_edges_triangle_criterion.begin(), edges.begin(),
-    //     [=] __device__ __host__ (const float x, const float y) {
-    //         return x or y;
-    //     }
-    // );
+    auto contracting_edges_triangle_criterion = calculate_contracting_edges_triangle_criterion(
+        A, node_costs, opts.max_cycle_length_lb, opts.tri_memory_factor, opts.verbose);
+    thrust::device_vector<float> edges(contracting_edges_edge_criterion.size());
+    thrust::transform(
+        contracting_edges_edge_criterion.begin(),
+        contracting_edges_edge_criterion.end(),
+        contracting_edges_triangle_criterion.begin(),
+        edges.begin(),
+        [=] __device__ __host__ (const float x, const float y) {
+            return x || y;
+        });
     if (opts.verbose) {
-        std::cout << "Number of edges found by edge criterion: " << thrust::reduce(edges.begin(), edges.end()) << std::endl;
+        std::cout << "Number of edges found by persistency criteria: " << thrust::reduce(edges.begin(), edges.end()) << std::endl;
     }
     return edges;
 }
@@ -339,5 +341,4 @@ std::tuple<dCOO, thrust::device_vector<int>> preprocessor_cuda(dCOO& A, const mu
         return {A, node_mapping};
     }
 }
-
 

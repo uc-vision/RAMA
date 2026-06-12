@@ -113,10 +113,10 @@ class CMakeBuild(build_ext):
 
 setup(
     name='rama-torch',
-    version='0.0.19',
+    version='0.0.20',
     description='Torch-native bindings for RAMA: Rapid algorithm for multicut.',
     packages=find_packages('.'),
-    ext_modules=[CMakeExtension(name='rama_py')],
+    ext_modules=[CMakeExtension(name='rama_torch')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
     setup_requires=['wheel']

@@ -283,7 +283,7 @@ std::vector<torch::Tensor> rama_torch(
 
 } // namespace
 
-PYBIND11_MODULE(rama_py, m) {
+PYBIND11_MODULE(rama_torch, m) {
     m.doc() = "Bindings for RAMA: Rapid algorithm for multicut. "
               "For running purely primal algorithm initialize multicut_solver_options with \"P\". "
               "For algorithm with best quality call with \"PD+\" where \"PD\" is default algorithm. "

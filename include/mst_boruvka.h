@@ -30,17 +30,6 @@
 
 namespace MST_boruvka {
 
-// Reduction functor: selects tuple with minimum weight, breaking ties by vertex id.
-struct binop_tuple_minimum {
-    typedef thrust::tuple<float, int, int> T; // (weight, destination, edge_id)
-    MST_HOST_DEVICE
-    T operator()(const T& a, const T& b) const {
-        return (thrust::get<0>(a) == thrust::get<0>(b))
-            ? ((thrust::get<1>(a) < thrust::get<1>(b)) ? a : b)
-            : ((thrust::get<0>(a) < thrust::get<0>(b)) ? a : b);
-    }
-};
-
 namespace detail {
 
 // Iterative pointer-doubling path compression.
@@ -133,30 +122,40 @@ maximum_spanning_tree(
             break;
         }
 
-        // Step 1: Sort edges by source vertex
-        thrust::sequence(RAMA_THRUST_EXEC indices.begin(), indices.begin() + n_edges);
-        thrust::sort_by_key(RAMA_THRUST_EXEC u.begin(), u.begin() + n_edges, indices.begin());
-
-        // Reorder v, w, id according to sort
-        thrust::gather(RAMA_THRUST_EXEC indices.begin(), indices.begin() + n_edges, v.begin(), v_tmp.begin());
-        thrust::gather(RAMA_THRUST_EXEC indices.begin(), indices.begin() + n_edges, w.begin(), w_tmp.begin());
-        thrust::gather(RAMA_THRUST_EXEC indices.begin(), indices.begin() + n_edges, id.begin(), id_tmp.begin());
-        v.swap(v_tmp);
-        w.swap(w_tmp);
-        id.swap(id_tmp);
-
-        // Step 2: Find minimum-weight edge per source vertex
-        auto new_last = thrust::reduce_by_key(RAMA_THRUST_EXEC 
-            u.begin(), u.begin() + n_edges,
+        // Steps 1-2: Sort by (source, weight, destination), then copy the first
+        // edge for each source. This avoids tuple reduce_by_key, which reads
+        // invalid tuple storage with CUDA 13 on sm_120.
+        thrust::sort_by_key(RAMA_THRUST_EXEC
+            thrust::make_zip_iterator(thrust::make_tuple(u.begin(), w.begin(), v.begin())),
             thrust::make_zip_iterator(thrust::make_tuple(
-                w.begin(), v.begin(), id.begin())),
-            rbk_keys.begin(),
+                u.begin() + n_edges, w.begin() + n_edges, v.begin() + n_edges)),
+            id.begin());
+        {
+            const int* u_ptr = thrust::raw_pointer_cast(u.data());
+            int* flags_ptr = thrust::raw_pointer_cast(flags.data());
+            thrust::for_each(RAMA_THRUST_EXEC
+                thrust::make_counting_iterator(0),
+                thrust::make_counting_iterator(n_edges),
+                [u_ptr, flags_ptr] MST_HOST_DEVICE (int pos) {
+                    flags_ptr[pos] = (pos == 0 || u_ptr[pos] != u_ptr[pos - 1]) ? 1 : 0;
+                });
+        }
+        thrust::exclusive_scan(RAMA_THRUST_EXEC
+            flags.begin(), flags.begin() + n_edges, indices.begin());
+        VectorType<int> last_scan(1), last_flag(1);
+        thrust::copy(RAMA_THRUST_EXEC
+            indices.begin() + n_edges - 1, indices.begin() + n_edges, last_scan.begin());
+        thrust::copy(RAMA_THRUST_EXEC
+            flags.begin() + n_edges - 1, flags.begin() + n_edges, last_flag.begin());
+        const int n_min_edges = last_scan[0] + last_flag[0];
+        thrust::scatter_if(RAMA_THRUST_EXEC
             thrust::make_zip_iterator(thrust::make_tuple(
-                rbk_w.begin(), rbk_v.begin(), rbk_id.begin())),
-            thrust::equal_to<int>(),
-            binop_tuple_minimum());
-
-        int n_min_edges = new_last.first - rbk_keys.begin();
+                u.begin(), w.begin(), v.begin(), id.begin())),
+            thrust::make_zip_iterator(thrust::make_tuple(
+                u.begin() + n_edges, w.begin() + n_edges, v.begin() + n_edges, id.begin() + n_edges)),
+            indices.begin(), flags.begin(),
+            thrust::make_zip_iterator(thrust::make_tuple(
+                rbk_keys.begin(), rbk_w.begin(), rbk_v.begin(), rbk_id.begin())));
 
         // Step 3: Build successor pointers
         // succ_input[vertex] = destination of min-weight edge from vertex
@@ -291,16 +290,12 @@ maximum_spanning_tree(
             thrust::make_zip_iterator(thrust::make_tuple(
                 u_tmp.begin(), v_tmp.begin(), w_tmp.begin(), id_tmp.begin())));
 
-        // Step 9: Relabel endpoints with new component IDs
-        {
-            const int* nv_ptr = thrust::raw_pointer_cast(new_vertices.data());
-            thrust::gather(RAMA_THRUST_EXEC u_tmp.begin(), u_tmp.begin() + new_n_edges, new_vertices.begin(), u_tmp.begin());
-            thrust::gather(RAMA_THRUST_EXEC v_tmp.begin(), v_tmp.begin() + new_n_edges, new_vertices.begin(), v_tmp.begin());
-        }
+        // Step 9: Relabel endpoints with new component IDs. Gather cannot write
+        // in-place because earlier outputs may overwrite later input indices.
+        thrust::gather(RAMA_THRUST_EXEC u_tmp.begin(), u_tmp.begin() + new_n_edges, new_vertices.begin(), u.begin());
+        thrust::gather(RAMA_THRUST_EXEC v_tmp.begin(), v_tmp.begin() + new_n_edges, new_vertices.begin(), v.begin());
 
         // Step 10: Swap buffers and repeat
-        u.swap(u_tmp);
-        v.swap(v_tmp);
         w.swap(w_tmp);
         id.swap(id_tmp);
 

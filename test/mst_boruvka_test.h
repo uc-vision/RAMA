@@ -252,7 +252,33 @@ void test_random_graphs() {
     std::cout << " passed" << std::endl;
 }
 
-// Test 7: Graph with equal-weight edges (tests tie-breaking)
+// Test 7: Production-scale graph that exercises repeated Boruvka contractions.
+template<template<typename> class VectorType>
+void test_large_random_graph() {
+    std::cout << "  test_large_random_graph..." << std::flush;
+    constexpr int n = 520;
+    auto rg = generate_random_graph(n, 0.04, 1200);
+    std::vector<int> st, sh;
+    std::vector<float> sc;
+    symmetrize(rg.tails, rg.heads, rg.costs, st, sh, sc);
+
+    VectorType<int> tails(st.begin(), st.end());
+    VectorType<int> heads(sh.begin(), sh.end());
+    VectorType<float> costs(sc.begin(), sc.end());
+    auto [mt, mh, mc] = MST_boruvka::maximum_spanning_tree<VectorType>(tails, heads, costs);
+
+    const float boruvka_cost = mst_cost<VectorType>(mc);
+    const float kruskal_cost = kruskal_max_spanning_tree_cost(n, rg.tails, rg.heads, rg.costs);
+    test(std::abs(boruvka_cost - kruskal_cost) < 1e-3f,
+        "large random graph: cost mismatch, boruvka=" + std::to_string(boruvka_cost) +
+        " kruskal=" + std::to_string(kruskal_cost));
+    test((int)mt.size() == n - 1,
+        "large random graph: expected " + std::to_string(n - 1) +
+        " edges, got " + std::to_string(mt.size()));
+    std::cout << " passed" << std::endl;
+}
+
+// Test 8: Graph with equal-weight edges (tests tie-breaking)
 template<template<typename> class VectorType>
 void test_equal_weights() {
     std::cout << "  test_equal_weights..." << std::flush;
@@ -283,5 +309,6 @@ void run_all_mst_boruvka_tests() {
     test_empty<VectorType>();
     test_equal_weights<VectorType>();
     test_random_graphs<VectorType>();
+    test_large_random_graph<VectorType>();
     std::cout << "All MST Boruvka tests passed." << std::endl;
 }

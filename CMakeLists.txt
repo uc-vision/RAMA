@@ -76,7 +76,7 @@ endif()
 CPMAddPackage(
     NAME CCCL
     GITHUB_REPOSITORY nvidia/cccl
-    GIT_TAG v2.8.3
+    GIT_TAG v3.2.0
 )
 target_link_libraries(RAMA INTERFACE CCCL::CCCL)
 

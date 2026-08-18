@@ -476,7 +476,7 @@ inline thrust::device_vector<int> compute_sanitized_graph(thrust::device_vector<
     auto first = thrust::make_zip_iterator(thrust::make_tuple(i.begin(), j.begin()));
     auto last = thrust::make_zip_iterator(thrust::make_tuple(i.end(), j.end()));
     auto new_last = thrust::unique_by_key(RAMA_THRUST_EXEC first, last, data.begin());
-    auto num_unique_edges = thrust::distance(first, new_last.first);
+    auto num_unique_edges = std::distance(first, new_last.first);
     i.resize(num_unique_edges);
     j.resize(num_unique_edges);
     data.resize(num_unique_edges);

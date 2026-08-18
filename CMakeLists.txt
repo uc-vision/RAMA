@@ -91,12 +91,11 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(RAMA INTERFACE OpenMP::OpenMP_CXX)
 endif()
 
-if(NOT WITH_CUDA)
-    message(FATAL_ERROR "RAMA Python bindings require WITH_CUDA=ON")
+if(WITH_CUDA)
+    message(STATUS "Compiling with PyTorch support")
+    find_package(Torch REQUIRED)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 endif()
-message(STATUS "Compiling with PyTorch support")
-find_package(Torch REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

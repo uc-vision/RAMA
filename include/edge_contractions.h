@@ -283,21 +283,24 @@ bool filter_cycles(
 
     assert(std::distance(first_merged_key, last_merged.first) == (int)total_size);
 
+    // Materialized ones instead of constant_iterator: a constant_iterator inside this
+    // zip makes cub's reduce_by_key value loads read wild addresses on sm_120
+    // (nvcc 13.x / CCCL 3.2), crashing the CUDA context.
+    VectorType<int> v_ones(total_size, 1);
     auto first_merged_val_with_count = thrust::make_zip_iterator(thrust::make_tuple(
         v_bottleneck_index_merged.begin(), v_bottleneck_value_merged.begin(),
-        thrust::make_constant_iterator<int>(1)));
+        v_ones.begin()));
 
     VectorType<int> v_rep_edges_reduced(total_size);
     VectorType<int> v_bottleneck_index_reduced(total_size);
     VectorType<int> num_occ(total_size);
-
     auto reduced_key_first = thrust::make_zip_iterator(thrust::make_tuple(
         thrust::make_discard_iterator(), v_rep_edges_reduced.begin()));
     auto reduced_val_first = thrust::make_zip_iterator(thrust::make_tuple(
         v_bottleneck_index_reduced.begin(), thrust::make_discard_iterator(), num_occ.begin()));
 
     thrust::equal_to<thrust::tuple<int, int>> binary_pred_comp;
-    auto last_reduce = thrust::reduce_by_key(RAMA_THRUST_EXEC 
+    auto last_reduce = thrust::reduce_by_key(RAMA_THRUST_EXEC
         first_merged_key, last_merged.first, first_merged_val_with_count,
         reduced_key_first, reduced_val_first, binary_pred_comp, reduce_intersecting_paths());
     int num_reduced = std::distance(reduced_key_first, last_reduce.first);

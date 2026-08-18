@@ -118,7 +118,7 @@ void deduplicate_triangles(
 
     thrust::sort(RAMA_THRUST_EXEC first, last);
     auto new_last = thrust::unique(RAMA_THRUST_EXEC first, last);
-    const auto new_size = thrust::distance(first, new_last);
+    const auto new_size = std::distance(first, new_last);
 
     tri_v1.resize(new_size);
     tri_v2.resize(new_size);
